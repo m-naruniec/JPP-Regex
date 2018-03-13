@@ -10,32 +10,49 @@ class Equiv a where
   (===) :: a -> a -> Bool
 
 instance (Eq c) => Equiv (Reg c) where
-   r1 === r2 = False
+  r1 === r2 = (simpl r1) == (simpl r2)
 
 instance Mon (Reg c) where
-  m1 = Empty
-  x <> y = Empty
+  m1 = Eps
+  (<>) = (:>)
 
 simpl :: Reg c -> Reg c
 simpl x = x
 
 nullable :: Reg c -> Bool
-nullable x = False
+nullable Empty = False
+nullable Eps = True
+nullable (Lit _) = False
+nullable (Many _) = True
+nullable (r1 :> r2) = (nullable r1) && (nullable r2)
+nullable (r1 :| r2) = (nullable r1) || (nullable r2)
 
 empty :: Reg c -> Bool
-empty r = False
+empty Empty = True
+empty Eps = False
+empty (Lit _) = False
+empty (Many _) = False
+empty (r1 :> r2) = (empty r1) || (empty r2)
+empty (r1 :| r2) = (empty r1) && (empty r2)
 
-der :: c -> Reg c -> Reg c
+-- continue
+der :: Eq c => c -> Reg c -> Reg c
+der _ Empty = Empty
+der _ Eps = Empty
+der c (Lit l)
+    | c == l = Eps
+    | otherwise = Empty
 der c r = r
 
+-- may need simpl
 ders :: Eq c => [c] -> Reg c -> Reg c
-ders c r = r
+ders = flip $ foldl $ flip der
 
 accepts :: Eq c => Reg c -> [c] -> Bool
-accepts r w = False
+accepts r w = nullable $ ders w r
 
 mayStart :: Eq c => c -> Reg c -> Bool
-mayStart c r = False
+mayStart c r = not $ empty $ der c r
 
 match :: Eq c => Reg c -> [c] -> Maybe [c]
 match r w = Nothing
@@ -61,3 +78,4 @@ number = digit :> Many digit
 ident = letter :> Many (letter :| digit)
 
 many1 r = r :> Many r
+
