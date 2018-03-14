@@ -24,10 +24,10 @@ main = do
 
        writeln "=== reflexive"
        quickCheck equivRefl
---       writeln "=== symmetric"
---       quickCheck equivSym
---       writeln "=== transitive"
---       quickCheck equivTrans
+       writeln "=== symmetric"
+       quickCheck equivSym
+       writeln "=== transitive"
+       quickCheck equivTrans
        writeln "=== compatible"
        quickCheck equivCompatible
 
