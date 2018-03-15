@@ -2,6 +2,7 @@ module RegExtra where
 import Mon
 import Reg
 import Data.List
+import Data.Functor -- TODO remove
 
 data AB = A | B deriving(Eq,Ord,Show)
 
@@ -17,24 +18,48 @@ instance Mon (Reg c) where
   (<>) = (:>)
 
 
-simpl :: Reg c -> Reg c
+simpl :: Eq c => Reg c -> Reg c
 simpl (Many r) = simpl' (Many (simpl r))
 simpl (r1 :> r2) = simpl' ((simpl r1) :> (simpl r2))
 simpl (r1 :| r2) = simpl' ((simpl r1) :| (simpl r2))
 simpl r = r
 
-simpl' :: Reg c -> Reg c
+simpl' :: Eq c => Reg c -> Reg c
 simpl' (Eps :> r) = r
 simpl' (r :> Eps) = r
 simpl' (Empty :> r) = Empty
 simpl' (r :> Empty) = Empty
 simpl' (Empty :| r) = r
 simpl' (r :| Empty) = r
+simpl' (Eps :| Eps) = Eps
+--simpl' (r :| Eps) = simpl' (Eps :| r) -- bubbling
+simpl' (Eps :| r) = simpl' (r :| Eps) -- bubbling
+simpl' r@(Lit c1 :| Lit c2)
+    | c1 == c2 = Lit c1
+    | otherwise = r
 simpl' (Many (Eps)) = Eps
 simpl' (Many (Empty)) = Eps
 simpl' (Many (Many r)) = Many r
-simpl' ((r1 :> r2) :> r3) = (r1 :> (r2 :> r3))
-simpl' ((r1 :| r2) :| r3) = (r1 :| (r2 :| r3))
+simpl' (Many (Eps :| r)) = simpl' $ Many r
+simpl' (Many (r :| Eps)) = simpl' $ Many r -- might be redundant
+--simpl' (Eps :| (Many r)) = Many r
+simpl' ((Many r) :| Eps) = Many r
+simpl' r@(Many (Lit c1) :| Many (Lit c2))
+    | c1 == c2 = Many (Lit c1)
+    | otherwise = r
+simpl' r@(Many (Lit c1) :> Many (Lit c2))
+    | c1 == c2 = Many (Lit c1)
+    | otherwise = r
+--simpl' r@((Many r1) :> (Many r2))
+--   | r1 == r2 = (Many r1)
+--   | otherwise = r
+--simpl' ((r1 :> r2) :> r3) = simpl' (r1 :> (simpl' (r2 :> r3)))
+--simpl' ((r1 :| r2) :| r3) = simpl' (r1 :| (simpl' (r2 :| r3)))
+simpl' (r1 :> (r2 :> r3)) = simpl' ((simpl' (r1 :> r2)) :> r3)
+simpl' (r1 :| (r2 :| r3)) = simpl' ((simpl' (r1 :| r2)) :| r3)
+--simpl' r@(r1 :| r2)
+--   | r1 == r2 = r1
+--   | otherwise = r
 simpl' r = r
 
 
@@ -56,27 +81,52 @@ empty (r1 :| r2) = (empty r1) && (empty r2)
 
 
 der :: Eq c => c -> Reg c -> Reg c
-der _ Empty = Empty
-der _ Eps = Empty
-der c (Lit l)
-    | c == l = Eps
-    | otherwise = Empty
-der c (Many r) = (der c r) :> (Many r)
-der c (r1 :> r2) =
-    if nullable r1
-        then notNulled :| r2'
-        else notNulled
+der c r = fst $ der' c r
+
+der' :: Eq c => c -> Reg c -> (Reg c, Bool)
+der' _ Empty = (Empty, False)
+der' _ Eps = (Empty, True)
+der' c (Lit l)
+    | c == l = (Eps, False)
+    | otherwise = (Empty, False)
+
+der' c (Many r) = ((simpl' $ (der c r) :> (Many r)), True)
+der' c (r1 :> r2) =
+    if r1Nullable
+        then ((simpl' $ notNulled :| r2'), r2Nullable)
+        else (notNulled, False)
     where
-        r1' = der c r1
-        r2' = der c r2
-        notNulled = r1' :> r2
-der c (r1 :| r2) = (der c r1) :| (der c r2)
+        (r1', r1Nullable) = der' c r1
+        (r2', r2Nullable) = der' c r2
+        notNulled = simpl' $ r1' :> r2
+der' c (r1 :| r2) = ((simpl' $ r1' :| r2'), (r1Nullable || r2Nullable))
+    where
+        (r1', r1Nullable) = der' c r1
+        (r2', r2Nullable) = der' c r2
+
+
+--der :: Eq c => c -> Reg c -> Reg c
+--der _ Empty = Empty
+--der _ Eps = Empty
+--der c (Lit l)
+--    | c == l = Eps
+--    | otherwise = Empty
+--der c (Many r) = (der c r) :> (Many r)
+--der c (r1 :> r2) =
+--    if nullable r1
+--        then notNulled :| r2'
+--        else notNulled
+--    where
+--        r1' = der c r1
+--        r2' = der c r2
+--        notNulled = r1' :> r2
+--der c (r1 :| r2) = (der c r1) :| (der c r2)
 
 ders :: Eq c => [c] -> Reg c -> Reg c
 ders c r = foldl f r' c
     where
         r' = simpl r
-        f rf c = simpl $ der c rf
+        f rf c = der c rf --simpl $ der c rf
 
 
 accepts :: Eq c => Reg c -> [c] -> Bool
@@ -86,34 +136,34 @@ mayStart :: Eq c => c -> Reg c -> Bool
 mayStart c r = not $ empty $ der c r
 
 match :: Eq c => Reg c -> [c] -> Maybe [c]
-match r w =
-    if empty r'
-        then Nothing
-        else Just $ reverse $ snd $ foldl f (r', []) w
-    where
-        r' = simpl r
-        f (rf, pref) c = (rf', pref')
-            where
-                rf' = simpl $ der c rf
-                pref' = if empty rf' then pref else c:pref
+match r w = Nothing
+--    if empty r'
+--        then Nothing
+--        else Just $ reverse $ snd $ foldl f (r', []) w
+--    where
+--        r' = simpl r
+--        f (rf, pref) c = (rf', pref')
+--            where
+--                rf' = simpl $ der c rf
+--                pref' = if empty rf' then pref else c:pref
 
 search :: Eq c => Reg c -> [c] -> Maybe [c]
-search r w =
-    if matches == []
-        then Nothing
-        else Just $ fst $ foldl f ([], 0) matches
-    where
-        matches = findall r w
-        f old@(_, maxLen) l = if len > maxLen then (l, len) else old
-            where len = length l
+search r w = Nothing
+--    if matches == []
+--        then Nothing
+--        else Just $ fst $ foldl f ([], 0) matches
+--    where
+--        matches = findall r w
+--        f old@(_, maxLen) l = if len > maxLen then (l, len) else old
+--            where len = length l
 
 findall :: Eq c => Reg c -> [c] -> [[c]]
-findall r w =
-    fromJust <$> (filter (/= Nothing) $ match r' <$> tails w)
-    where
-        r' = simpl r
-        fromJust (Just l) = l
-        fromJust _ = []
+findall r w = [[]]
+--    fromJust <$> (filter (/= Nothing) $ match r' <$> tails w)
+--    where
+--        r' = simpl r
+--        fromJust (Just l) = l
+--        fromJust _ = []
 
 
 char :: Char -> Reg Char
