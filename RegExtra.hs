@@ -17,17 +17,16 @@ instance Mon (Reg c) where
   m1 = Eps
   (<>) = (:>)
 
--- might need changing
 listToReg :: [Reg c] -> Reg c
-listToReg [] = Empty
-listToReg (h:t) = foldr (:|) h t
+listToReg = foldr1 (:|)
 
 simpl :: Eq c => Reg c -> Reg c
 simpl = listToReg . simpl'
 
-simplConcats :: Reg c -> Reg c
-simplConcats ((r1 :> r2) :> r3) = (r1 :> (r2 :> r3))
-simplConcats (r1 :> r2) = (simplConcats r1) :> (simplConcats r2)
+--simplConcats :: Reg c -> Reg c
+--simplConcats ((r1 :> r2) :> r3) = (r1 :> (r2 :> r3))
+--simplConcats (r1 :> r2) = (simplConcats r1) :> (simplConcats r2)
+--simplConcats r = r
 
 simpl' :: Eq c => Reg c -> [Reg c]
 simpl' (Many r) =
@@ -47,8 +46,8 @@ simpl' (r1 :> r2) =
         ([Eps], r) -> r
         (r, [Eps]) -> r
         -- Many Many ? chyba nie zadziala dla ponizszego
-        ([r1' :> r2'], r3') -> [r1' :> r2'']
-            where r2'' = (head(simpl' (r2' :> (listToReg r3'))))
+--        ([r1' :> r2'], r3') -> [r1' :> r2'']
+--            where r2'' = (head(simpl' (r2' :> (listToReg r3'))))
         (r1', r2') -> [((listToReg r1') :> (listToReg r2'))]
     where
         r1List = simpl' r1
