@@ -31,13 +31,13 @@ simpl = listToReg . simpl'
 simpl' :: Eq c => Reg c -> [Reg c]
 simpl' (Many r) =
     case rList of
-        [] -> [Eps]
+        [Eps] -> [Eps]
         [Empty] -> [Eps]
         -- ...TODO
         r'@[Many _] -> r'
         r' -> [Many $ listToReg r']
     where
-        rList = filter (/= Eps) $ simpl' r
+        rList = nub $ map (\x -> case x of {(Many y) -> y; y -> y}) $ simpl' r--filter (/= Eps) $ simpl' r
 simpl' ((r1 :> r2) :> r3) = simpl' (r1 :> (r2 :> r3))
 simpl' (r1 :> r2) =
     case (r1List, r2List) of
