@@ -3,5 +3,5 @@
 for ((i=0; i < $1; i++))
 do
     echo "Iteration number: $i"
-    time stack runhaskell ./TestReg.hs
+    time ./TestReg
 done
