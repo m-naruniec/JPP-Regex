@@ -27,8 +27,8 @@ simpl = altsReg . simpl'
             case rList of
                 [] -> [Eps]
                 [Empty] -> [Eps]
-                r'@[Many _] -> r'
-                r' -> [Many $ altsReg r']
+                l@[Many _] -> l
+                l -> [Many $ altsReg l]
             where
                 rList = filter (/= Eps) $ simpl' r
         simpl' ((r1 :> r2) :> r3) = simpl' (r1 :> (r2 :> r3))
@@ -36,17 +36,17 @@ simpl = altsReg . simpl'
             case (r1List, r2List) of
                 ([Empty], _) -> [Empty]
                 (_, [Empty]) -> [Empty]
-                ([Eps], r) -> r
-                (r, [Eps]) -> r
-                (r1', r2') -> [(altsReg r1') :> (altsReg r2')]
+                ([Eps], l) -> l
+                (l, [Eps]) -> l
+                (l1, l2) -> [(altsReg l1) :> (altsReg l2)]
             where
                 r1List = simpl' r1
                 r2List = simpl' r2
         simpl' (r1 :| r2) =
             case (r1List, r2List) of
-                ([Empty], r2') -> r2'
-                (r1', [Empty]) -> r1'
-                (r1', r2') -> union r1' r2'
+                ([Empty], l) -> l
+                (l, [Empty]) -> l
+                (l1, l2) -> union l1 l2
             where
                 r1List = simpl' r1
                 r2List = simpl' r2
