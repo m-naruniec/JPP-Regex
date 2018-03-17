@@ -101,17 +101,17 @@ mayStart :: Eq c => c -> Reg c -> Bool
 mayStart c r = not $ empty $ der c r
 
 match :: Eq c => Reg c -> [c] -> Maybe [c]
--- wrong!
 match r w =
-    if empty r'
-        then Nothing
-        else Just $ reverse $ snd $ foldl f (r', []) w
+    reverse <$> (third $ foldl f (r', [], startBest) w)
     where
         r' = simpl r
-        f (rf, pref) c = (rf', pref')
+        third (_, _, z) = z
+        startBest = if nullable r' then Just [] else Nothing
+        f (rf, pref, best) c = (rf', pref', best')
             where
                 rf' = simpl $ der c rf
-                pref' = if empty rf' then pref else c:pref
+                pref' = c:pref
+                best' = if nullable rf' then Just pref' else best
 
 search :: Eq c => Reg c -> [c] -> Maybe [c]
 search r w =
