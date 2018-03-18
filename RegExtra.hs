@@ -125,11 +125,12 @@ search r w =
 
 findall :: Eq c => Reg c -> [c] -> [[c]]
 findall r w =
-    fromJust <$> (filter (/= Nothing) $ match r' <$> tails w)
+    fromJust <$> (filter (/= Nothing) $ match r' <$> neTails w)
     where
         r' = simpl r
         fromJust (Just l) = l
         fromJust _ = []
+        neTails = delete [] . tails
 
 
 char :: Char -> Reg Char
