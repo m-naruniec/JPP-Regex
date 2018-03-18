@@ -113,24 +113,30 @@ match r w =
                 pref' = c:pref
                 best' = if nullable rf' then Just pref' else best
 
-search :: Eq c => Reg c -> [c] -> Maybe [c]
-search r w =
-    if matches == []
-        then Nothing
-        else Just $ fst $ foldl f ([], 0) matches
+-- works as search but also returns number of chars before match
+indexedSearch :: Eq c => Reg c -> [c] -> (Maybe [c], Int)
+indexedSearch r = foldl f (Nothing, -1) . tails
     where
-        matches = findall r w
-        f old@(_, maxLen) l = if len > maxLen then (l, len) else old
-            where len = length l
+        f (Nothing, i) t = (match r t, i + 1)
+        f acc _ = acc
+
+search :: Eq c => Reg c -> [c] -> Maybe [c]
+search r = fst . indexedSearch r
 
 findall :: Eq c => Reg c -> [c] -> [[c]]
-findall r w =
-    fromJust <$> (filter (/= Nothing) $ match r' <$> neTails w)
+findall r = reverse . fst . foldl f ([], 0) . delete [] . tails
     where
-        r' = simpl r
-        fromJust (Just l) = l
-        fromJust _ = []
-        neTails = delete [] . tails
+        f (l, 0) t =
+            if matched == Nothing
+                then (l, trash)
+                else (matched':l, trash)
+            where
+                (matched, i) = indexedSearch r t
+                (Just matched') = if matched == Nothing
+                                     then Just []
+                                     else matched
+                trash = max (i + (length matched') - 1) 0
+        f (l, trash) _ = (l, trash - 1)
 
 
 char :: Char -> Reg Char
