@@ -9,12 +9,21 @@ infix 4 ===
 class Equiv a where
   (===) :: a -> a -> Bool
 
+
+{- REGEX EQUIVALENCE -}
+
 instance (Eq c) => Equiv (Reg c) where
   r1 === r2 = (simpl r1) == (simpl r2)
+
+
+{- MONOID -}
 
 instance Mon (Reg c) where
   m1 = Eps
   (<>) = (:>)
+
+
+{- REGEX SIMPLIFICATION -}
 
 simpl :: Eq c => Reg c -> Reg c
 simpl = altsReg . simpl'
@@ -22,6 +31,7 @@ simpl = altsReg . simpl'
     altsReg :: [Reg c] -> Reg c
     altsReg = foldr1 (:|)
 
+    -- returns list of syntactically unique, simplified alternatives at toplevel
     simpl' :: Eq c => Reg c -> [Reg c]
     simpl' (Many r) =
       case rList of
@@ -57,6 +67,8 @@ simpl = altsReg . simpl'
     simpl' r = [r]
 
 
+{- LANGUAGE PREDICATES -}
+
 nullable :: Reg c -> Bool
 nullable Empty = False
 nullable Eps = True
@@ -73,6 +85,8 @@ empty (Many _) = False
 empty (r1 :> r2) = (empty r1) || (empty r2)
 empty (r1 :| r2) = (empty r1) && (empty r2)
 
+
+{- LANGUAGE DERIVATIVES -}
 
 der :: Eq c => c -> Reg c -> Reg c
 der _ Empty = Empty
@@ -98,12 +112,15 @@ ders w r = foldl f r' w
     f rf c = simpl $ der c rf
 
 
+{- WORD MATCHING -}
+
 accepts :: Eq c => Reg c -> [c] -> Bool
 accepts r w = nullable $ ders w r
 
 mayStart :: Eq c => c -> Reg c -> Bool
 mayStart c r = not $ empty $ der c r
 
+-- returns longest matching prefix
 match :: Eq c => Reg c -> [c] -> Maybe [c]
 match r w = reverse <$> (third $ foldl f (r', [], startBest) w)
   where
@@ -116,12 +133,14 @@ match r w = reverse <$> (third $ foldl f (r', [], startBest) w)
         pref' = c:pref
         best' = if nullable rf' then Just pref' else best
 
+-- returns first of the maximal length matching substrings
 search :: Eq c => Reg c -> [c] -> Maybe [c]
 search r = foldl f Nothing . tails
   where
     f Nothing t = match r t
     f acc _ = acc
 
+-- returns list of maximal matching substrings wrt. substring inclusion
 findall :: Eq c => Reg c -> [c] -> [[c]]
 findall r = reverse . fst . foldl f ([], (-1)) . delete [] . tails
   where
@@ -135,6 +154,9 @@ findall r = reverse . fst . foldl f ([], (-1)) . delete [] . tails
               if len <= reach
                 then (res, reach - 1)
                 else (s:res, len - 1)
+
+
+{- USEFUL REGEXES -}
 
 char :: Char -> Reg Char
 char = Lit
