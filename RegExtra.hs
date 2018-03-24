@@ -18,39 +18,43 @@ instance Mon (Reg c) where
 
 simpl :: Eq c => Reg c -> Reg c
 simpl = altsReg . simpl'
-    where
-        altsReg :: [Reg c] -> Reg c
-        altsReg = foldr1 (:|)
+  where
+    altsReg :: [Reg c] -> Reg c
+    altsReg = foldr1 (:|)
 
-        simpl' :: Eq c => Reg c -> [Reg c]
-        simpl' (Many r) =
-            case rList of
-                [] -> [Eps]
-                [Empty] -> [Eps]
-                l@[Many _] -> l
-                l -> [Many $ altsReg l]
-            where
-                rList = filter (/= Eps) $ simpl' r
-        simpl' ((r1 :> r2) :> r3) = simpl' (r1 :> (r2 :> r3))
-        simpl' (r1 :> r2) =
-            case (r1List, r2List) of
-                ([Empty], _) -> [Empty]
-                (_, [Empty]) -> [Empty]
-                ([Eps], l) -> l
-                (l, [Eps]) -> l
-                (l1, l2) -> [(altsReg l1) :> (altsReg l2)]
-            where
-                r1List = simpl' r1
-                r2List = simpl' r2
-        simpl' (r1 :| r2) =
-            case (r1List, r2List) of
-                ([Empty], l) -> l
-                (l, [Empty]) -> l
-                (l1, l2) -> union l1 l2
-            where
-                r1List = simpl' r1
-                r2List = simpl' r2
-        simpl' r = [r]
+    simpl' :: Eq c => Reg c -> [Reg c]
+    simpl' (Many r) =
+      case rList of
+        [] -> [Eps]
+        [Empty] -> [Eps]
+        l@[Many _] -> l
+        l -> [Many $ altsReg l]
+      where
+        rList = filter (/= Eps) $ simpl' r
+
+    simpl' ((r1 :> r2) :> r3) = simpl' (r1 :> (r2 :> r3))
+
+    simpl' (r1 :> r2) =
+      case (r1List, r2List) of
+        ([Empty], _) -> [Empty]
+        (_, [Empty]) -> [Empty]
+        ([Eps], l) -> l
+        (l, [Eps]) -> l
+        (l1, l2) -> [(altsReg l1) :> (altsReg l2)]
+      where
+        r1List = simpl' r1
+        r2List = simpl' r2
+
+    simpl' (r1 :| r2) =
+      case (r1List, r2List) of
+        ([Empty], l) -> l
+        (l, [Empty]) -> l
+        (l1, l2) -> union l1 l2
+      where
+        r1List = simpl' r1
+        r2List = simpl' r2
+
+    simpl' r = [r]
 
 
 nullable :: Reg c -> Bool
@@ -74,24 +78,24 @@ der :: Eq c => c -> Reg c -> Reg c
 der _ Empty = Empty
 der _ Eps = Empty
 der c (Lit l)
-    | c == l = Eps
-    | otherwise = Empty
+  | c == l = Eps
+  | otherwise = Empty
 der c (Many r) = (der c r) :> (Many r)
 der c (r1 :> r2) =
-    if nullable r1
-        then notNull :| r2'
-        else notNull
-    where
-        r1' = der c r1
-        r2' = der c r2
-        notNull = r1' :> r2
+  if nullable r1
+    then notNull :| r2'
+    else notNull
+  where
+    r1' = der c r1
+    r2' = der c r2
+    notNull = r1' :> r2
 der c (r1 :| r2) = (der c r1) :| (der c r2)
 
 ders :: Eq c => [c] -> Reg c -> Reg c
 ders w r = foldl f r' w
-    where
-        r' = simpl r
-        f rf c = simpl $ der c rf
+  where
+    r' = simpl r
+    f rf c = simpl $ der c rf
 
 
 accepts :: Eq c => Reg c -> [c] -> Bool
@@ -101,37 +105,36 @@ mayStart :: Eq c => c -> Reg c -> Bool
 mayStart c r = not $ empty $ der c r
 
 match :: Eq c => Reg c -> [c] -> Maybe [c]
-match r w =
-    reverse <$> (third $ foldl f (r', [], startBest) w)
-    where
-        r' = simpl r
-        third (_, _, z) = z
-        startBest = if nullable r' then Just [] else Nothing
-        f (rf, pref, best) c = (rf', pref', best')
-            where
-                rf' = simpl $ der c rf
-                pref' = c:pref
-                best' = if nullable rf' then Just pref' else best
+match r w = reverse <$> (third $ foldl f (r', [], startBest) w)
+  where
+    r' = simpl r
+    third (_, _, z) = z
+    startBest = if nullable r' then Just [] else Nothing
+    f (rf, pref, best) c = (rf', pref', best')
+      where
+        rf' = simpl $ der c rf
+        pref' = c:pref
+        best' = if nullable rf' then Just pref' else best
 
 search :: Eq c => Reg c -> [c] -> Maybe [c]
 search r = foldl f Nothing . tails
-    where
-        f Nothing t = match r t
-        f acc _ = acc
+  where
+    f Nothing t = match r t
+    f acc _ = acc
 
 findall :: Eq c => Reg c -> [c] -> [[c]]
 findall r = reverse . fst . foldl f ([], (-1)) . delete [] . tails
-    where
-        f (res, reach) t = newAcc
-            where
-                matched = match r t
-                newAcc = case matched of
-                    Nothing -> (res, reach - 1)
-                    Just s ->
-                        let len = length s in
-                            if len <= reach
-                                then (res, reach - 1)
-                                else (s:res, len - 1)
+  where
+    f (res, reach) t = newAcc
+      where
+        matched = match r t
+        newAcc = case matched of
+          Nothing -> (res, reach - 1)
+          Just s ->
+            let len = length s in
+              if len <= reach
+                then (res, reach - 1)
+                else (s:res, len - 1)
 
 char :: Char -> Reg Char
 char = Lit
